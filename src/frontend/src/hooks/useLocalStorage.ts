@@ -146,7 +146,14 @@ export function useCompleteDeliveries() {
     [setDeliveries],
   );
 
-  return { deliveries, addDelivery, removeDelivery };
+  const updateDelivery = useCallback(
+    (id: number, updated: LocalCompleteDelivery) => {
+      setDeliveries((prev) => prev.map((d) => (d.id === id ? updated : d)));
+    },
+    [setDeliveries],
+  );
+
+  return { deliveries, addDelivery, removeDelivery, updateDelivery };
 }
 
 export function getRatesStatic(): RateSettings {

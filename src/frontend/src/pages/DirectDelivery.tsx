@@ -1,6 +1,5 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Loader2 } from "lucide-react";
@@ -237,26 +236,30 @@ export default function DirectDelivery({
                 ))}
               </div>
             </div>
-            <div className="space-y-1.5">
+            <div className="space-y-2">
               <Label>Vehicle Number</Label>
               {filteredVehicles.length === 0 ? (
                 <p className="text-sm text-muted-foreground italic">
                   No vehicles added. Go to Settings to add vehicles.
                 </p>
               ) : (
-                <select
-                  value={vehicleNumber}
-                  onChange={(e) => setVehicleNumber(e.target.value)}
-                  data-ocid="direct_form.select"
-                  className="w-full border border-input rounded-md px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-ring"
-                >
-                  <option value="">Select vehicle number</option>
+                <div className="grid grid-cols-2 gap-2">
                   {filteredVehicles.map((v) => (
-                    <option key={v.number} value={v.number}>
+                    <button
+                      key={v.number}
+                      type="button"
+                      onClick={() => setVehicleNumber(v.number)}
+                      data-ocid="direct_form.vehicle_number.toggle"
+                      className={`py-2.5 px-3 rounded-xl text-sm font-semibold border-2 transition-all ${
+                        vehicleNumber === v.number
+                          ? "bg-primary text-white border-primary shadow-md"
+                          : "bg-white text-primary border-primary/60 hover:border-primary"
+                      }`}
+                    >
                       {v.number}
-                    </option>
+                    </button>
                   ))}
-                </select>
+                </div>
               )}
             </div>
           </CardContent>
@@ -280,21 +283,21 @@ export default function DirectDelivery({
                   </Label>
                   <div className="grid grid-cols-2 gap-2">
                     {laborNames.map((name) => (
-                      <div key={name} className="flex items-center gap-2">
-                        <Checkbox
-                          id={`load-${name}`}
-                          checked={loadingLabor.includes(name)}
-                          onCheckedChange={() =>
-                            toggleLabor(name, loadingLabor, setLoadingLabor)
-                          }
-                        />
-                        <Label
-                          htmlFor={`load-${name}`}
-                          className="cursor-pointer"
-                        >
-                          {name}
-                        </Label>
-                      </div>
+                      <button
+                        key={`load-${name}`}
+                        type="button"
+                        onClick={() =>
+                          toggleLabor(name, loadingLabor, setLoadingLabor)
+                        }
+                        data-ocid="direct_form.loading_labor.toggle"
+                        className={`py-2.5 px-3 rounded-xl text-sm font-semibold border-2 transition-all ${
+                          loadingLabor.includes(name)
+                            ? "bg-primary text-white border-primary shadow-md"
+                            : "bg-white text-primary border-primary/60 hover:border-primary"
+                        }`}
+                      >
+                        {name}
+                      </button>
                     ))}
                   </div>
                 </div>
@@ -304,21 +307,21 @@ export default function DirectDelivery({
                   </Label>
                   <div className="grid grid-cols-2 gap-2">
                     {laborNames.map((name) => (
-                      <div key={name} className="flex items-center gap-2">
-                        <Checkbox
-                          id={`unload-${name}`}
-                          checked={unloadingLabor.includes(name)}
-                          onCheckedChange={() =>
-                            toggleLabor(name, unloadingLabor, setUnloadingLabor)
-                          }
-                        />
-                        <Label
-                          htmlFor={`unload-${name}`}
-                          className="cursor-pointer"
-                        >
-                          {name}
-                        </Label>
-                      </div>
+                      <button
+                        key={`unload-${name}`}
+                        type="button"
+                        onClick={() =>
+                          toggleLabor(name, unloadingLabor, setUnloadingLabor)
+                        }
+                        data-ocid="direct_form.unloading_labor.toggle"
+                        className={`py-2.5 px-3 rounded-xl text-sm font-semibold border-2 transition-all ${
+                          unloadingLabor.includes(name)
+                            ? "bg-primary text-white border-primary shadow-md"
+                            : "bg-white text-primary border-primary/60 hover:border-primary"
+                        }`}
+                      >
+                        {name}
+                      </button>
                     ))}
                   </div>
                 </div>
