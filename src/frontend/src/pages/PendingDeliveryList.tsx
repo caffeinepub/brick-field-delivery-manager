@@ -1,7 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -123,6 +122,8 @@ function MarkCompleteDialog({
               bricks
             </p>
           </div>
+
+          {/* Vehicle Type */}
           <div className="space-y-2">
             <Label>Vehicle Type</Label>
             <div className="flex gap-2">
@@ -134,10 +135,10 @@ function MarkCompleteDialog({
                     setVehicleType(t);
                     setVehicleNumber("");
                   }}
-                  className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-all ${
+                  className={`flex-1 py-2.5 rounded-xl text-sm font-semibold border-2 transition-all ${
                     vehicleType === t
-                      ? "bg-primary text-primary-foreground border-primary"
-                      : "bg-white border-border"
+                      ? "bg-orange-500 text-white border-orange-500"
+                      : "bg-white text-orange-500 border-orange-400"
                   }`}
                 >
                   {t === "tractor" ? "Tractor" : "12 Wheel"}
@@ -145,6 +146,8 @@ function MarkCompleteDialog({
               ))}
             </div>
           </div>
+
+          {/* Vehicle Number — quick-select buttons */}
           <div className="space-y-2">
             <Label>Vehicle Number</Label>
             {filteredVehicles.length === 0 ? (
@@ -152,58 +155,75 @@ function MarkCompleteDialog({
                 No vehicles added in Settings
               </p>
             ) : (
-              <select
-                value={vehicleNumber}
-                onChange={(e) => setVehicleNumber(e.target.value)}
-                className="w-full border border-input rounded-md px-3 py-2 text-sm bg-white"
-              >
-                <option value="">Select vehicle</option>
+              <div className="flex flex-wrap gap-2">
                 {filteredVehicles.map((v) => (
-                  <option key={v.number} value={v.number}>
+                  <button
+                    key={v.number}
+                    type="button"
+                    onClick={() => setVehicleNumber(v.number)}
+                    className={`min-h-[44px] px-4 py-2 rounded-xl text-sm font-semibold border-2 transition-all ${
+                      vehicleNumber === v.number
+                        ? "bg-orange-500 text-white border-orange-500"
+                        : "bg-white text-orange-500 border-orange-400"
+                    }`}
+                  >
                     {v.number}
-                  </option>
+                  </button>
                 ))}
-              </select>
+              </div>
             )}
           </div>
+
+          {/* Labor Selection */}
           {laborNames.length > 0 && (
             <>
               <div className="space-y-2">
                 <Label className="font-semibold">Loading Labor</Label>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="flex flex-wrap gap-2">
                   {laborNames.map((name) => (
-                    <div key={name} className="flex items-center gap-2">
-                      <Checkbox
-                        id={`cload-${name}`}
-                        checked={loadingLabor.includes(name)}
-                        onCheckedChange={() =>
-                          toggleLabor(name, loadingLabor, setLoadingLabor)
-                        }
-                      />
-                      <Label htmlFor={`cload-${name}`}>{name}</Label>
-                    </div>
+                    <button
+                      key={name}
+                      type="button"
+                      onClick={() =>
+                        toggleLabor(name, loadingLabor, setLoadingLabor)
+                      }
+                      className={`min-h-[44px] px-4 py-2 rounded-xl text-sm font-semibold border-2 transition-all ${
+                        loadingLabor.includes(name)
+                          ? "bg-orange-500 text-white border-orange-500"
+                          : "bg-white text-orange-500 border-orange-400"
+                      }`}
+                      data-ocid="pending_list.toggle"
+                    >
+                      {name}
+                    </button>
                   ))}
                 </div>
               </div>
               <div className="space-y-2">
                 <Label className="font-semibold">Unloading Labor</Label>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="flex flex-wrap gap-2">
                   {laborNames.map((name) => (
-                    <div key={name} className="flex items-center gap-2">
-                      <Checkbox
-                        id={`cunload-${name}`}
-                        checked={unloadingLabor.includes(name)}
-                        onCheckedChange={() =>
-                          toggleLabor(name, unloadingLabor, setUnloadingLabor)
-                        }
-                      />
-                      <Label htmlFor={`cunload-${name}`}>{name}</Label>
-                    </div>
+                    <button
+                      key={name}
+                      type="button"
+                      onClick={() =>
+                        toggleLabor(name, unloadingLabor, setUnloadingLabor)
+                      }
+                      className={`min-h-[44px] px-4 py-2 rounded-xl text-sm font-semibold border-2 transition-all ${
+                        unloadingLabor.includes(name)
+                          ? "bg-orange-500 text-white border-orange-500"
+                          : "bg-white text-orange-500 border-orange-400"
+                      }`}
+                      data-ocid="pending_list.toggle"
+                    >
+                      {name}
+                    </button>
                   ))}
                 </div>
               </div>
             </>
           )}
+
           <div className="bg-accent rounded-xl p-3 flex justify-between items-center">
             <span className="text-sm font-semibold">Calculated Amount</span>
             <span className="text-lg font-bold text-primary">
