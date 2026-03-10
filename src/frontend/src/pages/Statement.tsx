@@ -2,8 +2,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 import { Download, FileText } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import PageHeader from "../components/PageHeader";
 import {
   getCompleteDeliveriesStatic,
@@ -76,12 +78,14 @@ function VehicleCard({
     }, 0);
   }
 
+  const hasLabor = allLaborNames.length > 0;
+
   return (
     <div
       className="rounded-xl shadow-md overflow-hidden bg-white"
       data-ocid={`statement.vehicle.card.${cardIndex}`}
     >
-      {/* Orange header — shared by both layouts */}
+      {/* Orange header */}
       <div className="bg-orange-500 text-white px-3 py-2.5 flex justify-between items-center">
         <span className="text-xs font-medium">
           {formatDate(deliveries[0]?.date ?? "")}
@@ -89,89 +93,37 @@ function VehicleCard({
         <span className="text-sm font-bold tracking-wide">{vehicleNumber}</span>
       </div>
 
-      {/* ── MOBILE LAYOUT: compact single-line delivery cards ── */}
-      <div className="block md:hidden divide-y divide-orange-100">
-        {deliveries.map((d, idx) => {
-          const qty = d.brickSelections.reduce(
-            (s, b) => (b.brickType !== "Bats" ? s + b.quantity : s),
-            0,
-          );
-          const laborOnDelivery = allLaborNames.filter(
-            (ln) => getLaborShare(d, ln) !== null,
-          );
-          return (
-            <div
-              key={d.id}
-              className={`px-3 py-2 ${
-                idx % 2 === 0 ? "bg-white" : "bg-orange-50/30"
-              }`}
-            >
-              {/* Single line: Name - Address - Qty Bricks | Amount on right */}
-              <div className="flex items-center justify-between gap-2">
-                <div className="text-sm font-semibold text-gray-800 truncate min-w-0">
-                  {d.customerName}
-                  {d.address ? ` - ${d.address}` : ""}
-                  {` - ${qty.toLocaleString("en-IN")} Bricks`}
-                </div>
-                <div className="font-bold text-orange-600 text-sm whitespace-nowrap shrink-0">
-                  {formatCurrency(d.calculatedAmount)}
-                </div>
-              </div>
-
-              {/* Labor chips: Rahul ₹29 | Soma ₹29 | Bharat ₹29 — slightly bigger */}
-              {laborOnDelivery.length > 0 && (
-                <div className="text-sm text-gray-400 mt-0.5 truncate">
-                  {laborOnDelivery
-                    .map((ln) => {
-                      const share = getLaborShare(d, ln);
-                      return `${ln} ${share !== null ? formatCurrency(share) : "—"}`;
-                    })
-                    .join(" | ")}
-                </div>
-              )}
-            </div>
-          );
-        })}
-
-        {/* Mobile total row */}
-        <div className="bg-orange-50 px-3 py-2.5 flex justify-between items-center border-t-2 border-orange-200">
-          <div>
-            <span className="text-xs font-bold text-orange-700 uppercase tracking-wide">
-              Total
-            </span>
-            <span className="text-xs text-orange-600 ml-2">
-              {totalQty.toLocaleString("en-IN")} bricks
-            </span>
-          </div>
-          <span className="font-bold text-orange-700 text-sm">
-            {formatCurrency(totalTrip)}
-          </span>
-        </div>
-      </div>
-
-      {/* ── DESKTOP LAYOUT: full table ── */}
-      <div className="hidden md:block">
-        <table className="w-full text-xs" style={{ tableLayout: "fixed" }}>
+      {/* ── TABLE LAYOUT ── */}
+      <div className="w-full overflow-x-auto">
+        <table
+          className="w-full text-xs"
+          style={{
+            tableLayout: hasLabor ? "auto" : "fixed",
+            minWidth: hasLabor
+              ? `${320 + allLaborNames.length * 60}px`
+              : "320px",
+          }}
+        >
           <colgroup>
-            <col style={{ width: allLaborNames.length > 0 ? "35%" : "50%" }} />
-            <col style={{ width: "15%" }} />
-            <col style={{ width: "20%" }} />
+            <col style={{ width: "22%" }} />
+            <col style={{ width: "22%" }} />
+            <col style={{ width: "12%" }} />
+            <col style={{ width: "14%" }} />
             {allLaborNames.map((ln) => (
-              <col
-                key={`col-${ln}`}
-                style={{
-                  width: `${Math.floor(30 / Math.max(allLaborNames.length, 1))}%`,
-                }}
-              />
+              <col key={`col-${ln}`} style={{ minWidth: "60px" }} />
             ))}
           </colgroup>
           <thead>
-            <tr className="bg-orange-500 text-white">
-              <th className="px-1.5 py-1.5 text-left">Customer</th>
-              <th className="px-1 py-1.5 text-right">Qty</th>
-              <th className="px-1 py-1.5 text-right">Amt</th>
+            <tr className="bg-orange-100 text-orange-800">
+              <th className="px-2 py-2 text-left font-semibold">Customer</th>
+              <th className="px-2 py-2 text-left font-semibold">Address</th>
+              <th className="px-2 py-2 text-right font-semibold">Bricks</th>
+              <th className="px-2 py-2 text-right font-semibold">Trip Amt</th>
               {allLaborNames.map((ln) => (
-                <th key={ln} className="px-1 py-1.5 text-right truncate">
+                <th
+                  key={ln}
+                  className="px-2 py-2 text-right font-semibold bg-orange-100 text-orange-800 truncate"
+                >
                   {ln}
                 </th>
               ))}
@@ -188,30 +140,29 @@ function VehicleCard({
                   key={d.id}
                   className={idx % 2 === 0 ? "bg-white" : "bg-orange-50/40"}
                 >
-                  <td className="px-1.5 py-1.5">
-                    <div className="font-semibold text-gray-800 leading-tight truncate">
-                      {d.customerName}
-                    </div>
-                    {d.address && (
-                      <div className="text-gray-400 text-[10px] leading-tight truncate mt-0.5">
-                        {d.address}
-                      </div>
-                    )}
+                  <td className="px-2 py-2 font-semibold text-gray-800 truncate">
+                    {d.customerName}
                   </td>
-                  <td className="px-1 py-1.5 text-right text-gray-700">
+                  <td className="px-2 py-2 text-gray-600 truncate">
+                    {d.address || "—"}
+                  </td>
+                  <td className="px-2 py-2 text-right text-gray-700">
                     {qty.toLocaleString("en-IN")}
                   </td>
-                  <td className="px-1 py-1.5 text-right font-medium text-gray-800">
+                  <td className="px-2 py-2 text-right font-bold text-orange-600">
                     {formatCurrency(d.calculatedAmount)}
                   </td>
                   {allLaborNames.map((ln) => {
                     const share = getLaborShare(d, ln);
                     return (
-                      <td
-                        key={ln}
-                        className="px-1 py-1.5 text-right text-gray-600"
-                      >
-                        {share !== null ? formatCurrency(share) : "—"}
+                      <td key={ln} className="px-2 py-2 text-right">
+                        {share === null ? (
+                          <span className="text-gray-300">—</span>
+                        ) : (
+                          <span className="font-semibold text-orange-600">
+                            {formatCurrency(share)}
+                          </span>
+                        )}
                       </td>
                     );
                   })}
@@ -221,16 +172,19 @@ function VehicleCard({
           </tbody>
           <tfoot>
             <tr className="bg-orange-50 font-bold border-t-2 border-orange-200">
-              <td className="px-1.5 py-1.5 text-orange-700">TOTAL</td>
-              <td className="px-1 py-1.5 text-right text-orange-700">
+              <td className="px-2 py-2 text-orange-700 uppercase text-[11px] tracking-wide">
+                Total
+              </td>
+              <td className="px-2 py-2" />
+              <td className="px-2 py-2 text-right text-orange-700">
                 {totalQty.toLocaleString("en-IN")}
               </td>
-              <td className="px-1 py-1.5 text-right text-orange-700">
+              <td className="px-2 py-2 text-right text-orange-700">
                 {formatCurrency(totalTrip)}
               </td>
               {allLaborNames.map((ln) => (
-                <td key={ln} className="px-1 py-1.5 text-right text-orange-700">
-                  {laborTotals[ln] > 0 ? formatCurrency(laborTotals[ln]) : "—"}
+                <td key={ln} className="px-2 py-2 text-right text-orange-700">
+                  {formatCurrency(laborTotals[ln] ?? 0)}
                 </td>
               ))}
             </tr>
@@ -245,31 +199,11 @@ export default function Statement({ onBack }: StatementProps) {
   const today = getTodayString();
   const monday = getMonday(new Date());
 
-  // Today tab date range (defaults to today → today)
   const [todayFrom, setTodayFrom] = useState(today);
   const [todayTo, setTodayTo] = useState(today);
 
-  // Weekly tab date range
   const [weekStart, setWeekStart] = useState(dateToStr(monday));
   const [weekEnd, setWeekEnd] = useState(dateToStr(getSunday(monday)));
-
-  useEffect(() => {
-    let styleEl = document.getElementById(
-      "print-styles",
-    ) as HTMLStyleElement | null;
-    if (!styleEl) {
-      styleEl = document.createElement("style");
-      styleEl.id = "print-styles";
-      document.head.appendChild(styleEl);
-    }
-    styleEl.textContent = `
-      @media print {
-        .no-print { display: none !important; }
-        body { background: white; }
-        .print-page { padding: 0; }
-      }
-    `;
-  }, []);
 
   const allDeliveries = useMemo(() => getCompleteDeliveriesStatic(), []);
   const allLaborNamesStored = useMemo(() => getLaborNamesStatic(), []);
@@ -363,17 +297,207 @@ export default function Statement({ onBack }: StatementProps) {
     return totals;
   }, [weeklyLaborByDate, weeklyLaborNames]);
 
-  const handlePrint = () => window.print();
+  // ── PDF GENERATION ──
+  const handleDownloadTodayPDF = () => {
+    const doc = new jsPDF({
+      orientation: "portrait",
+      unit: "mm",
+      format: "a4",
+    });
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const orange: [number, number, number] = [249, 115, 22];
+    const orangeLight: [number, number, number] = [255, 237, 213];
+    const white: [number, number, number] = [255, 255, 255];
+    const darkText: [number, number, number] = [30, 30, 30];
+
+    let y = 15;
+
+    // ── HEADER ──
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(20);
+    doc.setTextColor(...darkText);
+    doc.text("SAHA", pageWidth / 2, y, { align: "center" });
+    y += 8;
+    doc.setFontSize(13);
+    doc.text("S B C O BRICK FIELD", pageWidth / 2, y, { align: "center" });
+    y += 6;
+
+    // thin divider line
+    doc.setDrawColor(180, 180, 180);
+    doc.setLineWidth(0.4);
+    doc.line(14, y, pageWidth - 14, y);
+    y += 8;
+
+    // ── VEHICLE GROUPS ──
+    for (const [vehicleNumber, deliveries] of vehicleGroups) {
+      // vehicle sub-header
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(10);
+      doc.setTextColor(...white);
+      doc.setFillColor(...orange);
+      doc.roundedRect(14, y, pageWidth - 28, 8, 1.5, 1.5, "F");
+      doc.text(vehicleNumber, pageWidth / 2, y + 5.5, { align: "center" });
+      y += 11;
+
+      // build table rows
+      const head = [["Address", "Bricks", "Trip Amt", ...todayLaborNames]];
+
+      const body = deliveries.map((d) => {
+        const qty = d.brickSelections.reduce(
+          (s, b) => (b.brickType !== "Bats" ? s + b.quantity : s),
+          0,
+        );
+        const laborCells = todayLaborNames.map((ln) => {
+          const share = getLaborShare(d, ln);
+          return share === null ? "-" : `Rs${share}`;
+        });
+        return [
+          d.address || d.customerName || "-",
+          qty.toLocaleString("en-IN"),
+          `Rs${d.calculatedAmount}`,
+          ...laborCells,
+        ];
+      });
+
+      // total row
+      const totalQty = deliveries.reduce(
+        (sum, d) =>
+          sum +
+          d.brickSelections.reduce(
+            (s, b) => (b.brickType !== "Bats" ? s + b.quantity : s),
+            0,
+          ),
+        0,
+      );
+      const totalTrip = deliveries.reduce(
+        (sum, d) => sum + d.calculatedAmount,
+        0,
+      );
+      const laborTotals = todayLaborNames.map((ln) => {
+        const t = deliveries.reduce((sum, d) => {
+          const share = getLaborShare(d, ln);
+          return sum + (share ?? 0);
+        }, 0);
+        return `Rs${t}`;
+      });
+
+      const foot = [
+        [
+          "TOTAL",
+          totalQty.toLocaleString("en-IN"),
+          `Rs${totalTrip}`,
+          ...laborTotals,
+        ],
+      ];
+
+      // Build equal-width labor column styles
+      const tableContentWidth = pageWidth - 28;
+      const fixedWidth = 50 + 20 + 25; // address + bricks + tripAmt
+      const laborColWidth = Math.max(
+        18,
+        (tableContentWidth - fixedWidth) / Math.max(todayLaborNames.length, 1),
+      );
+      const dynamicColumnStyles: Record<
+        number,
+        { halign: "left" | "center" | "right"; cellWidth?: number }
+      > = {
+        0: { halign: "left", cellWidth: 50 },
+        1: { halign: "center", cellWidth: 20 },
+        2: { halign: "center", cellWidth: 25 },
+      };
+      todayLaborNames.forEach((_, i) => {
+        dynamicColumnStyles[3 + i] = {
+          halign: "center",
+          cellWidth: laborColWidth,
+        };
+      });
+
+      autoTable(doc, {
+        startY: y,
+        head,
+        body,
+        foot,
+        margin: { left: 14, right: 14 },
+        tableWidth: tableContentWidth,
+        styles: {
+          fontSize: 8,
+          cellPadding: 2.5,
+          overflow: "linebreak",
+          halign: "center",
+        },
+        headStyles: {
+          fillColor: orange,
+          textColor: white,
+          fontStyle: "bold",
+          halign: "center",
+        },
+        footStyles: {
+          fillColor: orangeLight,
+          textColor: [180, 60, 0] as [number, number, number],
+          fontStyle: "bold",
+          halign: "center",
+        },
+        columnStyles: dynamicColumnStyles,
+        alternateRowStyles: {
+          fillColor: [255, 250, 245] as [number, number, number],
+        },
+        tableLineColor: [220, 180, 150] as [number, number, number],
+        tableLineWidth: 0.2,
+        didDrawPage: (data) => {
+          y = (data.cursor?.y ?? y) + 6;
+        },
+      });
+
+      y =
+        (doc as jsPDF & { lastAutoTable: { finalY: number } }).lastAutoTable
+          .finalY + 8;
+    }
+
+    // ── LABOR GRAND TOTAL ──
+    if (todayLaborNames.length > 0) {
+      // section header
+      doc.setFillColor(...orange);
+      doc.roundedRect(14, y, pageWidth - 28, 8, 1.5, 1.5, "F");
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(10);
+      doc.setTextColor(...white);
+      doc.text("LABOR GRAND TOTAL", pageWidth / 2, y + 5.5, {
+        align: "center",
+      });
+      y += 12;
+
+      for (const ln of todayLaborNames) {
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(9);
+        doc.setTextColor(...darkText);
+        doc.text(ln, 20, y);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(...orange);
+        doc.text(`Rs${laborGrandTotals[ln] ?? 0}`, pageWidth - 20, y, {
+          align: "right",
+        });
+        // thin divider
+        doc.setDrawColor(230, 200, 180);
+        doc.setLineWidth(0.2);
+        doc.line(14, y + 2, pageWidth - 14, y + 2);
+        y += 7;
+      }
+    }
+
+    const dateLabel =
+      todayFrom === todayTo ? todayFrom : `${todayFrom}_to_${todayTo}`;
+    doc.save(`statement_${dateLabel}.pdf`);
+  };
+
+  const handlePrintWeekly = () => window.print();
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="no-print">
-        <PageHeader title="Statement" onBack={onBack} />
-      </div>
+      <PageHeader title="Statement" onBack={onBack} />
 
-      <div className="p-4 pb-8 print-page">
+      <div className="p-4 pb-8">
         <Tabs defaultValue="today">
-          <TabsList className="w-full mb-4 no-print">
+          <TabsList className="w-full mb-4">
             <TabsTrigger
               value="today"
               className="flex-1"
@@ -392,7 +516,6 @@ export default function Statement({ onBack }: StatementProps) {
 
           {/* ── TODAY TAB ── */}
           <TabsContent value="today" className="space-y-4">
-            {/* Date range filter — same design as Weekly */}
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
                 <Label className="text-xs">From Date</Label>
@@ -414,7 +537,6 @@ export default function Statement({ onBack }: StatementProps) {
               </div>
             </div>
 
-            {/* Vehicle-wise statement cards */}
             {todayDeliveries.length === 0 ? (
               <div
                 className="text-center py-16 text-gray-400"
@@ -438,7 +560,7 @@ export default function Statement({ onBack }: StatementProps) {
                   />
                 ))}
 
-                {/* Labor Grand Total — compact */}
+                {/* Labor Grand Total — compact, unchanged */}
                 {todayLaborNames.length > 0 && (
                   <div
                     className="rounded-xl border border-orange-300 bg-white shadow-sm overflow-hidden"
@@ -491,8 +613,8 @@ export default function Statement({ onBack }: StatementProps) {
             )}
 
             <Button
-              onClick={handlePrint}
-              className="w-full bg-orange-500 hover:bg-orange-600 text-white font-semibold rounded-xl no-print"
+              onClick={handleDownloadTodayPDF}
+              className="w-full bg-orange-500 hover:bg-orange-600 text-white font-semibold rounded-xl"
               data-ocid="statement.download.primary_button"
             >
               <Download className="w-4 h-4 mr-2" />
@@ -502,7 +624,6 @@ export default function Statement({ onBack }: StatementProps) {
 
           {/* ── WEEKLY TAB ── */}
           <TabsContent value="weekly" className="space-y-4">
-            {/* Date range inputs */}
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
                 <Label className="text-xs">From Date</Label>
@@ -524,7 +645,6 @@ export default function Statement({ onBack }: StatementProps) {
               </div>
             </div>
 
-            {/* Labor Grand Total table */}
             {weeklyDeliveries.length === 0 ? (
               <div
                 className="text-center py-16 text-gray-400"
@@ -604,7 +724,7 @@ export default function Statement({ onBack }: StatementProps) {
                           >
                             {laborAmounts[ln] > 0
                               ? formatCurrency(laborAmounts[ln])
-                              : "—"}
+                              : "-"}
                           </td>
                         ))}
                       </tr>
@@ -620,7 +740,7 @@ export default function Statement({ onBack }: StatementProps) {
                         >
                           {weeklyLaborColumnTotals[ln] > 0
                             ? formatCurrency(weeklyLaborColumnTotals[ln])
-                            : "—"}
+                            : "-"}
                         </td>
                       ))}
                     </tr>
@@ -630,9 +750,9 @@ export default function Statement({ onBack }: StatementProps) {
             )}
 
             <Button
-              onClick={handlePrint}
+              onClick={handlePrintWeekly}
               variant="outline"
-              className="w-full border-orange-400 text-orange-500 hover:bg-orange-50 font-semibold rounded-xl no-print"
+              className="w-full border-orange-400 text-orange-500 hover:bg-orange-50 font-semibold rounded-xl"
               data-ocid="statement.secondary_button"
             >
               <Download className="w-4 h-4 mr-2" />
