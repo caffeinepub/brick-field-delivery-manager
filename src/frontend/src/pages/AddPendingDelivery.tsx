@@ -5,29 +5,18 @@ import { Label } from "@/components/ui/label";
 import { Loader2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
-import { DeliveryType } from "../backend.d";
 import BrickSelector, {
-  initBrickState,
   getTotalBricks,
+  initBrickState,
   type BrickStateMap,
 } from "../components/BrickSelector";
 import PageHeader from "../components/PageHeader";
-import { useCreatePendingDelivery } from "../hooks/useQueries";
+import { usePendingDeliveries } from "../hooks/useLocalStorage";
 import { getTodayString } from "../types";
 
 interface AddPendingDeliveryProps {
   onBack: () => void;
   onSuccess: () => void;
-}
-
-function extractErrorMessage(err: unknown): string {
-  if (err instanceof Error) return err.message;
-  if (typeof err === "string") return err;
-  try {
-    return JSON.stringify(err);
-  } catch {
-    return String(err);
-  }
 }
 
 export default function AddPendingDelivery({
@@ -42,8 +31,9 @@ export default function AddPendingDelivery({
     "local",
   );
   const [brickState, setBrickState] = useState<BrickStateMap>(initBrickState());
+  const [isSaving, setIsSaving] = useState(false);
 
-  const createMutation = useCreatePendingDelivery();
+  const { addPendingDelivery } = usePendingDeliveries();
   const totalBricks = getTotalBricks(brickState);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -60,44 +50,39 @@ export default function AddPendingDelivery({
       return;
     }
 
-    // Build brick selections for non-Bats types
-    const brickSelections = Object.entries(brickState)
-      .filter(([bt, s]) => s.selected && bt !== "Bats")
-      .map(([bt, s]) => ({
-        brickType: bt,
-        quantity: BigInt(s.quantity || 0),
-      }));
-
-    // Handle Bats notes separately
-    const batsState = brickState.Bats;
-    const batsNotes = batsState?.selected ? batsState.batsNotes || null : null;
-
-    // Include Bats in selections with quantity 0 so it shows in list page
-    if (batsState?.selected) {
-      brickSelections.push({
-        brickType: "Bats",
-        quantity: BigInt(0),
-      });
-    }
-
+    setIsSaving(true);
     try {
-      await createMutation.mutateAsync({
+      const brickSelections = Object.entries(brickState)
+        .filter(([bt, s]) => s.selected && bt !== "Bats")
+        .map(([bt, s]) => ({
+          brickType: bt,
+          quantity: s.quantity || 0,
+        }));
+
+      const batsState = brickState.Bats;
+      const batsNotes = batsState?.selected
+        ? (batsState.batsNotes ?? undefined)
+        : undefined;
+
+      if (batsState?.selected) {
+        brickSelections.push({ brickType: "Bats", quantity: 0 });
+      }
+
+      addPendingDelivery({
+        id: Date.now(),
         date,
         customerName: customerName.trim(),
         address: address.trim(),
         dueAmount: Number.parseFloat(dueAmount) || 0,
-        distance: 0,
-        deliveryType:
-          deliveryType === "local" ? DeliveryType.local : DeliveryType.outside,
+        deliveryType,
         brickSelections,
         batsNotes,
       });
-      toast.success("Pending delivery saved successfully!");
+
+      toast.success("Pending Delivery Saved");
       onSuccess();
-    } catch (err) {
-      console.error("Save error:", err);
-      const message = extractErrorMessage(err);
-      toast.error(`Save failed: ${message}`, { duration: 8000 });
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -184,10 +169,10 @@ export default function AddPendingDelivery({
           <Button
             type="submit"
             className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
-            disabled={createMutation.isPending}
+            disabled={isSaving}
             data-ocid="pending_form.submit_button"
           >
-            {createMutation.isPending ? (
+            {isSaving ? (
               <>
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                 Saving...

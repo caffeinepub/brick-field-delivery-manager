@@ -1,5 +1,10 @@
-import { useCallback, useEffect, useState } from "react";
-import type { LocalCompleteDelivery, RateSettings, Vehicle } from "../types";
+import { useCallback, useState } from "react";
+import type {
+  LocalCompleteDelivery,
+  LocalPendingDelivery,
+  RateSettings,
+  Vehicle,
+} from "../types";
 import { DEFAULT_RATES } from "../types";
 
 const KEYS = {
@@ -7,6 +12,7 @@ const KEYS = {
   laborNames: "bf_laborNames",
   rates: "bf_rates",
   completeDeliveries: "bf_completeDeliveries",
+  pendingDeliveries: "bf_pendingDeliveries",
 };
 
 function load<T>(key: string, fallback: T): T {
@@ -117,43 +123,71 @@ export function useCompleteDeliveries() {
     () => load<LocalCompleteDelivery[]>(KEYS.completeDeliveries, []),
   );
 
-  const setDeliveries = useCallback(
-    (
-      d:
-        | LocalCompleteDelivery[]
-        | ((prev: LocalCompleteDelivery[]) => LocalCompleteDelivery[]),
-    ) => {
-      setDeliveriesState((prev) => {
-        const next = typeof d === "function" ? d(prev) : d;
-        save(KEYS.completeDeliveries, next);
-        return next;
-      });
+  const addDelivery = useCallback((delivery: LocalCompleteDelivery) => {
+    const current = load<LocalCompleteDelivery[]>(KEYS.completeDeliveries, []);
+    const next = [delivery, ...current];
+    save(KEYS.completeDeliveries, next);
+    setDeliveriesState(next);
+  }, []);
+
+  const removeDelivery = useCallback((id: number) => {
+    const current = load<LocalCompleteDelivery[]>(KEYS.completeDeliveries, []);
+    const next = current.filter((d) => d.id !== id);
+    save(KEYS.completeDeliveries, next);
+    setDeliveriesState(next);
+  }, []);
+
+  const updateDelivery = useCallback(
+    (id: number, updated: LocalCompleteDelivery) => {
+      const current = load<LocalCompleteDelivery[]>(
+        KEYS.completeDeliveries,
+        [],
+      );
+      const next = current.map((d) => (d.id === id ? updated : d));
+      save(KEYS.completeDeliveries, next);
+      setDeliveriesState(next);
     },
     [],
   );
 
-  const addDelivery = useCallback(
-    (delivery: LocalCompleteDelivery) => {
-      setDeliveries((prev) => [delivery, ...prev]);
-    },
-    [setDeliveries],
-  );
-
-  const removeDelivery = useCallback(
-    (id: number) => {
-      setDeliveries((prev) => prev.filter((d) => d.id !== id));
-    },
-    [setDeliveries],
-  );
-
-  const updateDelivery = useCallback(
-    (id: number, updated: LocalCompleteDelivery) => {
-      setDeliveries((prev) => prev.map((d) => (d.id === id ? updated : d)));
-    },
-    [setDeliveries],
-  );
-
   return { deliveries, addDelivery, removeDelivery, updateDelivery };
+}
+
+export function usePendingDeliveries() {
+  const [deliveries, setDeliveriesState] = useState<LocalPendingDelivery[]>(
+    () => load<LocalPendingDelivery[]>(KEYS.pendingDeliveries, []),
+  );
+
+  const addPendingDelivery = useCallback((delivery: LocalPendingDelivery) => {
+    const current = load<LocalPendingDelivery[]>(KEYS.pendingDeliveries, []);
+    const next = [delivery, ...current];
+    save(KEYS.pendingDeliveries, next);
+    setDeliveriesState(next);
+  }, []);
+
+  const removePendingDelivery = useCallback((id: number) => {
+    const current = load<LocalPendingDelivery[]>(KEYS.pendingDeliveries, []);
+    const next = current.filter((d) => d.id !== id);
+    save(KEYS.pendingDeliveries, next);
+    setDeliveriesState(next);
+  }, []);
+
+  const updatePendingDelivery = useCallback(
+    (id: number, updated: LocalPendingDelivery) => {
+      const current = load<LocalPendingDelivery[]>(KEYS.pendingDeliveries, []);
+      const next = current.map((d) => (d.id === id ? updated : d));
+      save(KEYS.pendingDeliveries, next);
+      setDeliveriesState(next);
+    },
+    [],
+  );
+
+  return {
+    deliveries,
+    addPendingDelivery,
+    removePendingDelivery,
+    updatePendingDelivery,
+  };
 }
 
 export function getRatesStatic(): RateSettings {
@@ -183,4 +217,8 @@ export function saveCompleteDeliveryStatic(
 ): void {
   const existing = getCompleteDeliveriesStatic();
   save(KEYS.completeDeliveries, [delivery, ...existing]);
+}
+
+export function getPendingDeliveriesStatic(): LocalPendingDelivery[] {
+  return load<LocalPendingDelivery[]>(KEYS.pendingDeliveries, []);
 }

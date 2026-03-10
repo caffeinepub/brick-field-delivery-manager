@@ -10,45 +10,46 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { CheckCircle, Loader2, Package, Pencil, Trash2 } from "lucide-react";
+import { CheckCircle, Package, Pencil, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
-import { DeliveryType, type PendingDelivery } from "../backend.d";
 import BrickSelector, {
-  initBrickState,
   getTotalBricks,
+  initBrickState,
   type BrickStateMap,
 } from "../components/BrickSelector";
 import PageHeader from "../components/PageHeader";
 import {
   saveCompleteDeliveryStatic,
   useLaborNames,
+  usePendingDeliveries,
   useRates,
   useVehicles,
 } from "../hooks/useLocalStorage";
 import {
-  useCreatePendingDelivery,
-  useDeletePendingDelivery,
-  useGetPendingDeliveries,
-} from "../hooks/useQueries";
-import { calculateDeliveryAmount, formatCurrency, formatDate } from "../types";
+  type LocalPendingDelivery,
+  calculateDeliveryAmount,
+  formatCurrency,
+  formatDate,
+} from "../types";
 
 // ─── Mark Complete Dialog ───────────────────────────────────────────────────
 interface MarkCompleteDialogProps {
-  delivery: PendingDelivery;
+  delivery: LocalPendingDelivery;
   onClose: () => void;
   onDone: () => void;
+  onRemovePending: (id: number) => void;
 }
 
 function MarkCompleteDialog({
   delivery,
   onClose,
   onDone,
+  onRemovePending,
 }: MarkCompleteDialogProps) {
   const { vehicles } = useVehicles();
   const { laborNames } = useLaborNames();
   const { rates } = useRates();
-  const deleteMutation = useDeletePendingDelivery();
 
   const [vehicleType, setVehicleType] = useState<"tractor" | "twelveWheel">(
     "tractor",
@@ -59,7 +60,7 @@ function MarkCompleteDialog({
 
   const filteredVehicles = vehicles.filter((v) => v.type === vehicleType);
   const totalBricks = delivery.brickSelections.reduce(
-    (sum, b) => (b.brickType !== "Bats" ? sum + Number(b.quantity) : sum),
+    (sum, b) => (b.brickType !== "Bats" ? sum + b.quantity : sum),
     0,
   );
   const hasBats = delivery.brickSelections.some((b) => b.brickType === "Bats");
@@ -81,37 +82,30 @@ function MarkCompleteDialog({
     );
   };
 
-  const handleConfirm = async () => {
+  const handleConfirm = () => {
     if (!vehicleNumber) {
       toast.error("Please select a vehicle number");
       return;
     }
-    try {
-      saveCompleteDeliveryStatic({
-        id: Date.now(),
-        customerName: delivery.customerName,
-        vehicleType,
-        date: delivery.date,
-        vehicleNumber,
-        calculatedAmount,
-        unloadingLabor,
-        brickSelections: delivery.brickSelections.map((b) => ({
-          brickType: b.brickType,
-          quantity: Number(b.quantity),
-        })),
-        loadingLabor,
-        deliveryType: delivery.deliveryType,
-        distance: delivery.distance,
-        batsNotes: delivery.batsNotes,
-        address: delivery.address,
-        dueAmount: delivery.dueAmount,
-      });
-      await deleteMutation.mutateAsync(delivery.id);
-      toast.success("Delivery marked as complete!");
-      onDone();
-    } catch {
-      toast.error("Failed to mark complete");
-    }
+    saveCompleteDeliveryStatic({
+      id: Date.now(),
+      customerName: delivery.customerName,
+      vehicleType,
+      date: delivery.date,
+      vehicleNumber,
+      calculatedAmount,
+      unloadingLabor,
+      brickSelections: delivery.brickSelections,
+      loadingLabor,
+      deliveryType: delivery.deliveryType,
+      distance: 0,
+      batsNotes: delivery.batsNotes,
+      address: delivery.address,
+      dueAmount: delivery.dueAmount,
+    });
+    onRemovePending(delivery.id);
+    toast.success("Delivery marked as complete!");
+    onDone();
   };
 
   return (
@@ -246,15 +240,10 @@ function MarkCompleteDialog({
           </Button>
           <Button
             onClick={handleConfirm}
-            disabled={deleteMutation.isPending}
             className="bg-primary text-primary-foreground"
             data-ocid="pending_list.confirm_button"
           >
-            {deleteMutation.isPending ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              "Confirm Complete"
-            )}
+            Confirm Complete
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -264,18 +253,19 @@ function MarkCompleteDialog({
 
 // ─── Edit Pending Delivery Dialog ───────────────────────────────────────────
 interface EditPendingDialogProps {
-  delivery: PendingDelivery;
+  delivery: LocalPendingDelivery;
   onClose: () => void;
   onDone: () => void;
+  onUpdate: (id: number, updated: LocalPendingDelivery) => void;
 }
 
-function brickSelectionsToState(delivery: PendingDelivery): BrickStateMap {
+function brickSelectionsToState(delivery: LocalPendingDelivery): BrickStateMap {
   const state = initBrickState();
   for (const sel of delivery.brickSelections) {
     if (state[sel.brickType] !== undefined) {
       state[sel.brickType] = {
         selected: true,
-        quantity: Number(sel.quantity),
+        quantity: sel.quantity,
         batsNotes: sel.brickType === "Bats" ? (delivery.batsNotes ?? "") : "",
       };
     }
@@ -287,6 +277,7 @@ function EditPendingDialog({
   delivery,
   onClose,
   onDone,
+  onUpdate,
 }: EditPendingDialogProps) {
   const [date, setDate] = useState(delivery.date);
   const [customerName, setCustomerName] = useState(delivery.customerName);
@@ -298,13 +289,11 @@ function EditPendingDialog({
   const [brickState, setBrickState] = useState<BrickStateMap>(() =>
     brickSelectionsToState(delivery),
   );
+  const [isSaving, setIsSaving] = useState(false);
 
-  const deleteMutation = useDeletePendingDelivery();
-  const createMutation = useCreatePendingDelivery();
-  const isSaving = deleteMutation.isPending || createMutation.isPending;
   const totalBricks = getTotalBricks(brickState);
 
-  const handleSave = async () => {
+  const handleSave = () => {
     if (!customerName.trim()) {
       toast.error("Customer name is required");
       return;
@@ -315,34 +304,34 @@ function EditPendingDialog({
       return;
     }
 
-    const brickSelections = Object.entries(brickState)
-      .filter(([bt, s]) => s.selected && bt !== "Bats")
-      .map(([bt, s]) => ({ brickType: bt, quantity: BigInt(s.quantity || 0) }));
-
-    const batsState = brickState.Bats;
-    const batsNotes = batsState?.selected ? batsState.batsNotes || null : null;
-    if (batsState?.selected) {
-      brickSelections.push({ brickType: "Bats", quantity: BigInt(0) });
-    }
-
+    setIsSaving(true);
     try {
-      await deleteMutation.mutateAsync(delivery.id);
-      await createMutation.mutateAsync({
+      const brickSelections = Object.entries(brickState)
+        .filter(([bt, s]) => s.selected && bt !== "Bats")
+        .map(([bt, s]) => ({ brickType: bt, quantity: s.quantity || 0 }));
+
+      const batsState = brickState.Bats;
+      const batsNotes = batsState?.selected
+        ? (batsState.batsNotes ?? undefined)
+        : undefined;
+      if (batsState?.selected) {
+        brickSelections.push({ brickType: "Bats", quantity: 0 });
+      }
+
+      onUpdate(delivery.id, {
+        ...delivery,
         date,
         customerName: customerName.trim(),
         address: address.trim(),
         dueAmount: Number.parseFloat(dueAmount) || 0,
-        distance: 0,
-        deliveryType:
-          deliveryType === "local" ? DeliveryType.local : DeliveryType.outside,
+        deliveryType,
         brickSelections,
         batsNotes,
       });
       toast.success("Delivery updated successfully!");
       onDone();
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      toast.error(`Update failed: ${msg}`, { duration: 8000 });
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -357,7 +346,6 @@ function EditPendingDialog({
         </DialogHeader>
 
         <div className="space-y-4">
-          {/* Date */}
           <div className="space-y-1.5">
             <Label>Date</Label>
             <Input
@@ -368,7 +356,6 @@ function EditPendingDialog({
             />
           </div>
 
-          {/* Customer Name */}
           <div className="space-y-1.5">
             <Label>Customer Name *</Label>
             <Input
@@ -379,7 +366,6 @@ function EditPendingDialog({
             />
           </div>
 
-          {/* Address */}
           <div className="space-y-1.5">
             <Label>Address</Label>
             <Input
@@ -390,7 +376,6 @@ function EditPendingDialog({
             />
           </div>
 
-          {/* Due Amount */}
           <div className="space-y-1.5">
             <Label>Due Amount (₹)</Label>
             <Input
@@ -403,7 +388,6 @@ function EditPendingDialog({
             />
           </div>
 
-          {/* Delivery Type */}
           <div className="space-y-1.5">
             <Label>Delivery Type</Label>
             <div className="flex gap-2">
@@ -424,7 +408,6 @@ function EditPendingDialog({
             </div>
           </div>
 
-          {/* Brick Selector */}
           <BrickSelector brickState={brickState} onChange={setBrickState} />
         </div>
 
@@ -442,13 +425,9 @@ function EditPendingDialog({
             className="bg-primary text-primary-foreground flex-1"
             data-ocid="edit_pending.save_button"
           >
-            {isSaving ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : totalBricks > 0 ? (
-              `Save Update (${totalBricks.toLocaleString("en-IN")} bricks)`
-            ) : (
-              "Save Update"
-            )}
+            {totalBricks > 0
+              ? `Save Update (${totalBricks.toLocaleString("en-IN")} bricks)`
+              : "Save Update"}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -464,20 +443,16 @@ interface PendingDeliveryListProps {
 export default function PendingDeliveryList({
   onBack,
 }: PendingDeliveryListProps) {
-  const { data: deliveries = [], isLoading } = useGetPendingDeliveries();
-  const deleteMutation = useDeletePendingDelivery();
+  const { deliveries, removePendingDelivery, updatePendingDelivery } =
+    usePendingDeliveries();
   const [markingComplete, setMarkingComplete] =
-    useState<PendingDelivery | null>(null);
-  const [editing, setEditing] = useState<PendingDelivery | null>(null);
+    useState<LocalPendingDelivery | null>(null);
+  const [editing, setEditing] = useState<LocalPendingDelivery | null>(null);
 
-  const handleDelete = async (id: bigint) => {
+  const handleDelete = (id: number) => {
     if (!confirm("Delete this pending delivery?")) return;
-    try {
-      await deleteMutation.mutateAsync(id);
-      toast.success("Deleted successfully");
-    } catch {
-      toast.error("Failed to delete");
-    }
+    removePendingDelivery(id);
+    toast.success("Deleted successfully");
   };
 
   return (
@@ -485,16 +460,7 @@ export default function PendingDeliveryList({
       <PageHeader title="Pending Deliveries" onBack={onBack} />
 
       <div className="p-4 space-y-3 pb-8">
-        {isLoading && (
-          <div
-            className="flex justify-center py-12"
-            data-ocid="pending_list.loading_state"
-          >
-            <Loader2 className="w-8 h-8 animate-spin text-primary" />
-          </div>
-        )}
-
-        {!isLoading && deliveries.length === 0 && (
+        {deliveries.length === 0 && (
           <div
             className="text-center py-16 space-y-3"
             data-ocid="pending_list.empty_state"
@@ -511,18 +477,16 @@ export default function PendingDeliveryList({
 
         {deliveries.map((delivery, idx) => {
           const totalBricks = delivery.brickSelections.reduce(
-            (sum, b) =>
-              b.brickType !== "Bats" ? sum + Number(b.quantity) : sum,
+            (sum, b) => (b.brickType !== "Bats" ? sum + b.quantity : sum),
             0,
           );
           return (
             <Card
-              key={delivery.id.toString()}
+              key={delivery.id}
               data-ocid={`pending_list.item.${idx + 1}`}
               className="overflow-hidden rounded-2xl shadow-sm"
             >
               <CardContent className="pt-4 space-y-3">
-                {/* Header */}
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex-1 min-w-0">
                     <h3 className="font-semibold text-base truncate">
@@ -540,7 +504,6 @@ export default function PendingDeliveryList({
                   </Badge>
                 </div>
 
-                {/* Stats */}
                 <div className="grid grid-cols-3 gap-2 text-center">
                   <div className="bg-muted rounded-lg py-2">
                     <div className="text-xs text-muted-foreground">Date</div>
@@ -562,7 +525,6 @@ export default function PendingDeliveryList({
                   </div>
                 </div>
 
-                {/* Brick badges */}
                 {delivery.brickSelections.length > 0 && (
                   <div className="flex flex-wrap gap-1">
                     {delivery.brickSelections.map((b) => (
@@ -574,20 +536,18 @@ export default function PendingDeliveryList({
                         {b.brickType}:
                         {b.brickType === "Bats"
                           ? " Safety"
-                          : ` ${Number(b.quantity).toLocaleString("en-IN")}`}
+                          : ` ${b.quantity.toLocaleString("en-IN")}`}
                       </Badge>
                     ))}
                   </div>
                 )}
 
-                {/* Action buttons: Delete | Edit | Mark Complete */}
                 <div className="flex gap-2 pt-1">
                   <Button
                     variant="outline"
                     size="sm"
                     className="text-destructive border-destructive/30 hover:bg-destructive/5"
                     onClick={() => handleDelete(delivery.id)}
-                    disabled={deleteMutation.isPending}
                     data-ocid={`pending_list.delete_button.${idx + 1}`}
                   >
                     <Trash2 className="w-4 h-4" />
@@ -623,6 +583,7 @@ export default function PendingDeliveryList({
           delivery={markingComplete}
           onClose={() => setMarkingComplete(null)}
           onDone={() => setMarkingComplete(null)}
+          onRemovePending={removePendingDelivery}
         />
       )}
 
@@ -631,6 +592,7 @@ export default function PendingDeliveryList({
           delivery={editing}
           onClose={() => setEditing(null)}
           onDone={() => setEditing(null)}
+          onUpdate={updatePendingDelivery}
         />
       )}
     </div>

@@ -1,6 +1,4 @@
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -10,7 +8,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2, Package, Pencil, Trash2 } from "lucide-react";
+import { Package, Pencil, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import BrickSelector, {
@@ -144,7 +142,6 @@ function EditCompleteDialog({
         </DialogHeader>
 
         <div className="space-y-4">
-          {/* Date */}
           <div className="space-y-1.5">
             <Label>Date</Label>
             <Input
@@ -154,8 +151,6 @@ function EditCompleteDialog({
               data-ocid="edit_complete.date.input"
             />
           </div>
-
-          {/* Customer Name */}
           <div className="space-y-1.5">
             <Label>Customer Name *</Label>
             <Input
@@ -165,8 +160,6 @@ function EditCompleteDialog({
               data-ocid="edit_complete.customer.input"
             />
           </div>
-
-          {/* Address */}
           <div className="space-y-1.5">
             <Label>Address</Label>
             <Input
@@ -176,8 +169,6 @@ function EditCompleteDialog({
               data-ocid="edit_complete.address.input"
             />
           </div>
-
-          {/* Due Amount */}
           <div className="space-y-1.5">
             <Label>Due Amount (₹)</Label>
             <Input
@@ -189,8 +180,6 @@ function EditCompleteDialog({
               data-ocid="edit_complete.due.input"
             />
           </div>
-
-          {/* Delivery Type */}
           <div className="space-y-1.5">
             <Label>Delivery Type</Label>
             <div className="flex gap-2">
@@ -210,8 +199,6 @@ function EditCompleteDialog({
               ))}
             </div>
           </div>
-
-          {/* Vehicle Type */}
           <div className="space-y-2">
             <Label>Vehicle Type</Label>
             <div className="flex gap-2">
@@ -234,8 +221,6 @@ function EditCompleteDialog({
               ))}
             </div>
           </div>
-
-          {/* Vehicle Number */}
           <div className="space-y-2">
             <Label>Vehicle Number</Label>
             {filteredVehicles.length === 0 ? (
@@ -261,8 +246,6 @@ function EditCompleteDialog({
               </div>
             )}
           </div>
-
-          {/* Labor */}
           {laborNames.length > 0 && (
             <>
               <div className="space-y-2">
@@ -309,8 +292,6 @@ function EditCompleteDialog({
               </div>
             </>
           )}
-
-          {/* Brick Selector */}
           <BrickSelector brickState={brickState} onChange={setBrickState} />
         </div>
 
@@ -365,7 +346,7 @@ export default function CompleteDeliveryList({
     <div className="min-h-screen bg-background">
       <PageHeader title="Complete Deliveries" onBack={onBack} />
 
-      <div className="p-4 space-y-3 pb-8">
+      <div className="p-3 space-y-2.5 pb-8">
         {deliveries.length === 0 && (
           <div
             className="text-center py-16 space-y-3"
@@ -393,104 +374,105 @@ export default function CompleteDeliveryList({
           const uniqueLabor = [...new Set(allLabor)];
 
           return (
-            <Card
+            <div
               key={delivery.id}
               data-ocid={`complete_list.item.${idx + 1}`}
-              className="overflow-hidden rounded-2xl shadow-sm"
+              className="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100"
             >
-              <div className="h-1 bg-green-500" />
-              <CardContent className="pt-4 space-y-3">
-                {/* Header */}
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-base truncate">
-                      {delivery.customerName}
-                    </h3>
-                    <p className="text-sm text-muted-foreground">
-                      {delivery.vehicleNumber} ·{" "}
-                      {delivery.vehicleType === "tractor"
-                        ? "Tractor"
-                        : "12 Wheel"}
-                    </p>
-                  </div>
-                  <div className="text-right shrink-0">
-                    <div className="text-lg font-bold text-primary">
-                      {formatCurrency(delivery.calculatedAmount)}
-                    </div>
-                    <div className="text-xs text-muted-foreground">
-                      {formatDate(delivery.date)}
-                    </div>
-                  </div>
+              {/* Green top accent line */}
+              <div className="h-[3px] bg-green-500" />
+
+              <div className="px-3 py-2.5 space-y-1.5">
+                {/* Row 1: Customer Name — Amount */}
+                <div className="flex items-baseline justify-between gap-2">
+                  <span className="font-bold text-sm text-gray-900 truncate flex-1">
+                    {delivery.customerName}
+                  </span>
+                  <span className="font-bold text-sm text-orange-500 shrink-0">
+                    {formatCurrency(delivery.calculatedAmount)}
+                  </span>
                 </div>
 
-                {/* Stats: Bricks + Type only (no Dist/KM) */}
-                <div className="grid grid-cols-2 gap-2 text-center">
-                  <div className="bg-muted rounded-lg py-2">
-                    <div className="text-xs text-muted-foreground">Bricks</div>
-                    <div className="text-sm font-bold text-primary mt-0.5">
+                {/* Row 2: Vehicle Number • Date */}
+                <div className="flex items-center gap-1.5 text-xs text-gray-500">
+                  <span className="font-medium text-gray-700">
+                    {delivery.vehicleNumber}
+                  </span>
+                  <span>•</span>
+                  <span>{formatDate(delivery.date)}</span>
+                </div>
+
+                {/* Divider */}
+                <div className="border-t border-gray-100" />
+
+                {/* Row 3: Bricks | Type */}
+                <div className="flex items-center gap-3 text-xs">
+                  <span className="text-gray-500">
+                    Bricks:{" "}
+                    <span className="font-semibold text-gray-800">
                       {totalBricks.toLocaleString("en-IN")}
-                    </div>
-                  </div>
-                  <div className="bg-muted rounded-lg py-2">
-                    <div className="text-xs text-muted-foreground">Type</div>
-                    <div className="text-xs font-semibold mt-0.5 capitalize">
+                    </span>
+                  </span>
+                  <span className="text-gray-300">|</span>
+                  <span className="text-gray-500">
+                    Type:{" "}
+                    <span className="font-semibold text-gray-800 capitalize">
                       {delivery.deliveryType === "local" ? "Local" : "Outside"}
-                    </div>
-                  </div>
+                    </span>
+                  </span>
                 </div>
 
-                {/* Labor names */}
+                {/* Row 4: Labor names */}
                 {uniqueLabor.length > 0 && (
-                  <div className="text-xs text-muted-foreground">
+                  <div className="text-xs text-gray-500">
                     Labor:{" "}
-                    <span className="text-foreground font-medium">
+                    <span className="font-bold text-gray-800 text-sm">
                       {uniqueLabor.join(", ")}
                     </span>
                   </div>
                 )}
 
-                {/* Brick badges */}
+                {/* Row 5: Brick type breakdown */}
                 {delivery.brickSelections.length > 0 && (
-                  <div className="flex flex-wrap gap-1">
+                  <div className="flex flex-wrap gap-x-3 gap-y-0.5">
                     {delivery.brickSelections.map((b) => (
-                      <Badge
-                        key={b.brickType}
-                        variant="secondary"
-                        className="text-xs"
-                      >
-                        {b.brickType}:
-                        {b.brickType === "Bats"
-                          ? " Safety"
-                          : ` ${b.quantity.toLocaleString("en-IN")}`}
-                      </Badge>
+                      <span key={b.brickType} className="text-xs text-gray-500">
+                        {b.brickType}:{" "}
+                        <span className="font-semibold text-gray-700">
+                          {b.brickType === "Bats"
+                            ? "Safety"
+                            : b.quantity.toLocaleString("en-IN")}
+                        </span>
+                      </span>
                     ))}
                   </div>
                 )}
 
-                {/* Action buttons: Delete | Edit */}
-                <div className="flex gap-2 pt-1">
+                {/* Action buttons */}
+                <div className="flex gap-2 pt-0.5">
                   <Button
                     variant="outline"
                     size="sm"
-                    className="text-destructive border-destructive/30 hover:bg-destructive/5"
+                    className="h-7 px-2.5 text-xs text-red-500 border-red-200 hover:bg-red-50 hover:text-red-600 rounded-lg"
                     onClick={() => handleDelete(delivery.id)}
                     data-ocid={`complete_list.delete_button.${idx + 1}`}
                   >
-                    <Trash2 className="w-4 h-4" />
+                    <Trash2 className="w-3 h-3 mr-1" />
+                    Delete
                   </Button>
                   <Button
                     variant="outline"
                     size="sm"
-                    className="flex-1 text-orange-600 border-orange-300 hover:bg-orange-50"
+                    className="h-7 px-2.5 text-xs text-orange-600 border-orange-200 hover:bg-orange-50 rounded-lg"
                     onClick={() => setEditing(delivery)}
                     data-ocid={`complete_list.edit_button.${idx + 1}`}
                   >
-                    <Pencil className="w-4 h-4 mr-1" />
+                    <Pencil className="w-3 h-3 mr-1" />
                     Edit
                   </Button>
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
           );
         })}
       </div>

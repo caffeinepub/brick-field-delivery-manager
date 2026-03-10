@@ -33,6 +33,17 @@ export interface LocalCompleteDelivery {
   dueAmount: number;
 }
 
+export interface LocalPendingDelivery {
+  id: number;
+  customerName: string;
+  date: string;
+  address: string;
+  dueAmount: number;
+  deliveryType: string;
+  brickSelections: BrickSelectionLocal[];
+  batsNotes?: string;
+}
+
 export const BRICK_TYPES = [
   "1 No Bricks",
   "2 No Bricks",

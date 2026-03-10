@@ -95,6 +95,11 @@ export default function DirectDelivery({
       toast.error("Please select a vehicle number");
       return;
     }
+    const anyBrickSelected = Object.values(brickState).some((s) => s.selected);
+    if (!anyBrickSelected) {
+      toast.error("Please select at least one brick type");
+      return;
+    }
 
     setIsSaving(true);
     try {
@@ -122,7 +127,7 @@ export default function DirectDelivery({
         address: address.trim(),
         dueAmount: Number.parseFloat(dueAmount) || 0,
       });
-      toast.success("Direct delivery saved!");
+      toast.success("Delivery Completed Successfully");
       onSuccess();
     } catch {
       toast.error("Failed to save delivery");
